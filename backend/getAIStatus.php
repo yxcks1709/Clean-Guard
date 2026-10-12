@@ -6,28 +6,21 @@ header("Content-Type: application/json");
 include "config.php";
 
 /*
-    Reads the latest AI prediction for a device from `restroom_sencor_fake_data`
-    -- the table the Raspberry Pi AI model already writes its prediction
-    results into. This endpoint only ever reads from it; it never writes,
-    never creates another table, and never invents a value that isn't
-    already a real column in this table.
+    Latest AI decision for a device, from `ai_predictions` (written by
+    ai/worker.py through saveAIStatus.php).
 
-    Modes:
-      - getAIStatus.php?device_id=D1-001
-            Latest prediction row for that device (Live/Test mode -- the
-            AI panel should always show the newest prediction available).
+      getAIStatus.php?device_id=D1-001
+            Newest decision (Live/Test mode).
 
-      - getAIStatus.php?device_id=D1-001&at=2026-07-13 15:30:00
-            The prediction row whose created_at is closest to `at`
-            (History mode, matched to the specific historical sensor
-            reading the user tapped/clicked). If nothing is within a
-            5-minute tolerance -- the same bucket size getHistory.php
-            already uses -- no row is returned rather than attaching a
-            mismatched prediction to that record.
+      getAIStatus.php?device_id=D1-001&at=2026-07-13 15:30:00
+            Decision closest to `at` within 5 minutes (History mode).
+
+      &table=test   decisions made on sensor_data_test (Test tab).
 */
 
 $deviceId = $_GET["device_id"] ?? null;
 $at = $_GET["at"] ?? null;
+$source = (($_GET["table"] ?? "live") === "test") ? "test" : "live";
 
 if (!$deviceId) {
     echo json_encode(["available" => false, "error" => "device_id is required"]);
@@ -35,60 +28,53 @@ if (!$deviceId) {
 }
 
 $columns = "
-    device_id,
-    temperature,
-    humidity,
-    mq135_raw,
-    window_open_predicted,
-    window_open_probability,
-    faucet_on_predicted,
-    faucet_on_probability,
-    leak_active_predicted,
-    leak_active_probability,
-    freeze_risk_1h_predicted,
-    freeze_risk_1h_probability,
-    freeze_risk_3h_predicted,
-    freeze_risk_3h_probability,
-    created_at
+    source, device_id, reading_id, created_at, processed_at, ready, level, headline,
+    odor, odor_minutes, door_open, door_source, window_open, window_source,
+    light_on, lux, leak, leak_probability, pipe_frozen, freeze_risk_1h, freeze_risk_3h,
+    items_json, probabilities_json
 ";
 
 $TOLERANCE_SECONDS = 300;
 
 if ($at) {
-    $sql = "
+    $stmt = $conn->prepare("
         SELECT $columns
-        FROM restroom_sencor_fake_data
-        WHERE device_id = ?
-          AND ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) <= $TOLERANCE_SECONDS
+        FROM ai_predictions
+        WHERE source = ? AND device_id = ?
+          AND created_at BETWEEN (? - INTERVAL $TOLERANCE_SECONDS SECOND) AND (? + INTERVAL $TOLERANCE_SECONDS SECOND)
         ORDER BY ABS(TIMESTAMPDIFF(SECOND, created_at, ?)) ASC
         LIMIT 1
-    ";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("sss", $deviceId, $at, $at);
+    ");
+    $stmt->bind_param("sssss", $source, $deviceId, $at, $at, $at);
 } else {
-    $sql = "
+    $stmt = $conn->prepare("
         SELECT $columns
-        FROM restroom_sencor_fake_data
-        WHERE device_id = ?
-        ORDER BY created_at DESC
+        FROM ai_predictions
+        WHERE source = ? AND device_id = ?
+        ORDER BY created_at DESC, reading_id DESC
         LIMIT 1
-    ";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("s", $deviceId);
+    ");
+    $stmt->bind_param("ss", $source, $deviceId);
 }
 
 $stmt->execute();
-$result = $stmt->get_result();
-$row = $result->fetch_assoc();
+$row = $stmt->get_result()->fetch_assoc();
 
 if (!$row) {
     echo json_encode(["available" => false]);
 } else {
+    foreach (["ready", "odor", "door_open", "window_open", "light_on", "leak", "pipe_frozen"] as $flag) {
+        $row[$flag] = $row[$flag] === null ? null : (bool)$row[$flag];
+    }
+    foreach (["odor_minutes", "lux", "leak_probability"] as $number) {
+        $row[$number] = $row[$number] === null ? null : floatval($row[$number]);
+    }
+    $row["items"] = json_decode($row["items_json"] ?? "[]", true) ?: [];
+    $row["probabilities"] = json_decode($row["probabilities_json"] ?? "{}", true) ?: new stdClass();
+    unset($row["items_json"], $row["probabilities_json"]);
     $row["available"] = true;
-    echo json_encode($row);
+    echo json_encode($row, JSON_UNESCAPED_UNICODE);
 }
 
 $stmt->close();
 $conn->close();
-
-?>

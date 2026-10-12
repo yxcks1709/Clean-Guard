@@ -1,0 +1,15 @@
+{
+  "api_base": "https://kbu1.dothome.co.kr",
+  "api_key": "cleanguard-ai-change-me",
+  "poll_seconds": 5,
+  "warmup_hours": 10,
+  "settings": {
+    "adc_scale": 4.0029,
+    "light_on_lux": 40,
+    "light_off_lux": 20,
+    "light_idle_minutes": 30,
+    "odor_persist_minutes": 10,
+    "frozen_c": 0.0,
+    "frozen_minutes": 10
+  }
+}

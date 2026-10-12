@@ -97,10 +97,9 @@ export default function SidePanel({
                     </div>
                 </div>
 
-                {/* AI ANALYSIS -- placeholder + AI TEST button only; the real
-                    connection is provided by a separate server for the
-                    demonstration (see AIStatusCard). */}
-                <AIStatusCard />
+                {/* AI ANALYSIS -- latest decision of the AI service
+                    (odor, door/window, lights, leak, frozen pipes). */}
+                <AIStatusCard deviceId={selectedRow.id} table={selectedRow.source ?? "live"} />
 
                 {/* HISTORICAL TREND CHART */}
                 <div>

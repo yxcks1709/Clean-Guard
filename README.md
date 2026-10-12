@@ -35,41 +35,42 @@ orientation, with no separate builds.
 - **Historical trend charts** — per-device temperature/humidity/air-quality line chart, backed by 5-minute-bucketed averages.
 - **Device Management (CRUD)** — register, edit, and remove sensor nodes, with building/floor/bathroom parsed from a single location string.
 - **Responsive, orientation-aware UI** — a dedicated mobile app for portrait phones, a landscape/tablet dashboard, and the original desktop dashboard, all sharing the same components, hooks, and services.
-- **AI status panel (in progress)** — a prepared UI slot for AI-based predictions (window open, faucet on, leak, freeze risk) written by a separate Raspberry Pi process; currently a placeholder pending the live demo's AI server.
+- **AI detection** — bad odor, door/window open, lights left on, water leaks and frozen pipes, judged every 15 s per restroom by the AI service in [`ai/`](ai/README.md) (model from [restroom_sensor_ai](https://github.com/bangak684/restroom_sensor_ai)) and shown in the AI Analysis card.
 
 ## Technologies
 
 **Frontend:** React 19, Vite 8, Tailwind CSS 4, React Router 7, Recharts
 **Backend:** PHP 8, MySQLi, MySQL/MariaDB
-**Hardware:** ESP8266, DHT22 (temperature/humidity), MQ-135 (air quality)
-**AI (external):** Raspberry Pi prediction service, writing to a shared MySQL table
+**Hardware:** ESP8266 (D1 mini), DHT11 (temperature/humidity), MQ-135 (air quality), BH1750 (light, optional), reed switches (door/window, optional)
+**AI:** Python 3.13 + scikit-learn service in `ai/` (runs on the server PC or a Raspberry Pi)
 
 ## Architecture
 
 ```
-ESP8266 sensor nodes  --HTTP POST-->  backend/ (PHP)  <-->  MySQL
-        |                                  ^
-        | DHT22 + MQ-135 readings          | reads/writes
-        v                                  |
-   upload.php  ------------------------->  sensor_data / sensor_data_test / devices
-                                                   ^
-                                                   | GET (JSON)
-                                                   |
-                                          frontend/ (React dashboard)
-                                                   |
-                                                   v
+ESP8266 sensor nodes  --HTTP POST every 15 s-->  backend/ (PHP)  <-->  MySQL
+        |                                             ^
+        | DHT11 + MQ-135 (+ BH1750, reed switches)    | reads/writes
+        v                                             |
+   upload.php  -------------------------------->  sensor_data / sensor_data_test / devices
+                                                      ^            |
+                                                      |            | getAIInput.php
+                                     GET (JSON)       |            v
+                                                      |      ai/worker.py (model + rules)
+                                                      |            |
+                                                      |            | saveAIStatus.php
+                                                      |            v
+                                                      |      ai_predictions --> getAIStatus.php
+                                                      |                              |
+                                          frontend/ (React dashboard) <--------------+
+                                                      |
+                                                      v
                                           Facility administrator
-
-Raspberry Pi AI process (separate) --> restroom_sencor_fake_data table --> getAIStatus.php
-  (reads sensor_data independently;    (read-only from the frontend's perspective;
-   the React app never runs the         not currently displayed live — see AIStatusCard)
-   AI model itself)
 ```
 
 Each layer has one job: the ESP8266 nodes only sense and report; PHP only
 validates and moves data between HTTP and MySQL; MySQL is the single
-source of truth; React only fetches and renders; the Raspberry Pi process
-is entirely separate from and asynchronous to the React app.
+source of truth; the AI service (`ai/`) only turns readings into decisions;
+React only fetches and renders.
 
 ## Folder Structure
 
@@ -88,7 +89,8 @@ CleanGuard/
 │   └── .env.example
 ├── backend/            PHP REST API (one file per endpoint)
 ├── database/            Schema reference (see database/README.md)
-├── esp8266/              Sensor node documentation
+├── esp8266/              Sensor node firmware (PlatformIO) + wiring
+├── ai/                    AI detection service (Python)
 ├── documentation/         Capstone report, presentation, source code reference
 ├── screenshots/            App screenshots
 ├── legacy/                  Superseded prototype code, kept for history
@@ -158,8 +160,7 @@ hooks, and API services.
 
 ## Future Work
 
-- Wire the AI panel to the live prediction server for the demonstration.
-- Automate the sync between `sensor_data` and the AI prediction table (currently a manual/separate process).
+- Recalibrate the AI thresholds with real (not simulated) restroom data.
 - Authentication for administrators.
 - Push/email notifications when a restroom enters Warning or Danger status.
 - Move the backend from HTTP to HTTPS.

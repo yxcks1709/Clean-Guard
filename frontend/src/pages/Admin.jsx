@@ -5,7 +5,7 @@ import BuildingSelector from "../components/BuildingSelector";
 import BathroomGrid from "../components/BathroomGrid";
 import SidePanel from "../components/SidePanel";
 import HistoryPanel from "../components/HistoryPanel";
-import { getStatusInfo } from "../utils/status";
+import { getRowStatus } from "../utils/status";
 import { parseLocation, groupByBuilding } from "../utils/location";
 import { useSensorData } from "../hooks/useSensorData";
 
@@ -32,7 +32,7 @@ export default function CleanGuardDashboard() {
     const buildings = useMemo(
         () =>
             groupByBuilding(sensorData, (row) =>
-                getStatusInfo(Number(row.temperature), Number(row.humidity), row.air_quality).level
+                getRowStatus(row).level
             ),
         [sensorData]
     );
@@ -50,11 +50,7 @@ export default function CleanGuardDashboard() {
     const summary = filteredData.reduce(
         (acc, item) => {
 
-            const { level } = getStatusInfo(
-                Number(item.temperature),
-                Number(item.humidity),
-                item.air_quality
-            );
+            const { level } = getRowStatus(item);
 
             acc[level]++;
 

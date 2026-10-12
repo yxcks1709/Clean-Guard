@@ -22,7 +22,7 @@ returns JSON.
 
 | File | Method | Responsibility |
 |---|---|---|
-| `upload.php` | POST | Ingests one ESP8266 reading; inserts into `sensor_data` / `sensor_data_test`. |
+| `upload.php` | POST | Ingests one ESP8266 reading (JSON or form-encoded; optional `lux`, `door`, `window`); inserts into `sensor_data` / `sensor_data_test`. |
 | `getSensors.php` | GET | Latest reading per device (`?table=live\|test`) — powers Live/Test mode. |
 | `getHistory.php` | GET | One device's readings (`?device_id=`), grouped into 5-minute buckets — powers the trend chart. |
 | `getSensorLog.php` | GET | Every reading, newest first, paginated (`?page=&pageSize=`) — powers History mode's log. |
@@ -30,11 +30,12 @@ returns JSON.
 | `addDevice.php` | POST | Adds a device (validates required fields + unique ID). |
 | `updateDevice.php` | POST | Updates a device's name/location/status (ID is read-only). |
 | `deleteDevice.php` | POST | Removes a device. |
-| `getAIStatus.php` | GET | Reads a device's latest (or timestamp-matched) AI prediction from `restroom_sencor_fake_data`. Read-only; currently not called by the frontend (the AI panel is a placeholder — see the frontend's `AIStatusCard.jsx`). |
+| `getAIStatus.php` | GET | Latest (or timestamp-matched, `&at=`) AI decision for a device from `ai_predictions`: odor, door/window, lights, leak, frozen pipes. Used by `AIStatusCard`. |
+| `getAIInput.php` | GET | Raw readings for the AI service (`?after_id=` or `?since_minutes=`). Requires the `X-API-Key` header. |
+| `saveAIStatus.php` | POST | Stores AI decisions into `ai_predictions`. Requires the `X-API-Key` header. |
 
-Write endpoints use prepared statements with bound parameters, with one
-noted exception: `upload.php` uses raw string-interpolated SQL and
-accepts a `"table": "history"` option that maps to a table
-(`sensor_data_history`) that doesn't exist in the schema — both are
-pre-existing characteristics of that endpoint, left unmodified since this
-cleanup pass does not change functionality.
+All write endpoints use prepared statements with bound parameters.
+
+The AI endpoints share a key defined in `ai_config.php` (or the
+`CLEANGUARD_AI_KEY` environment variable); put the same value in
+`ai/config.json`. See [`../ai/README.md`](../ai/README.md).

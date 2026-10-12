@@ -30,8 +30,9 @@ switch($table){
 
 }
 
-$sql = "
+$source = $sensorTable === "sensor_data_test" ? "test" : "live";
 
+$baseSql = "
 SELECT
     d.id,
     d.NAME,
@@ -40,27 +41,38 @@ SELECT
     s.temperature,
     s.humidity,
     s.air_quality,
-    s.created_at
-
+    s.created_at,
+    '$source' AS source
+    %s
 FROM devices d
-
 LEFT JOIN $sensorTable s
-
 ON d.id = s.device_id
-
+%s
 WHERE s.id = (
-
     SELECT MAX(id)
-
     FROM $sensorTable
-
     WHERE device_id = d.id
-
 )
-
+ORDER BY d.location, d.id
 ";
 
-$result = $conn->query($sql);
+// Latest AI decision per device (ai/worker.py), so cards can show it.
+$aiColumns = ", a.level AS ai_level, a.headline AS ai_headline, a.created_at AS ai_at";
+$aiJoin = "
+LEFT JOIN ai_predictions a
+ON a.id = (
+    SELECT p.id FROM ai_predictions p
+    WHERE p.source = '$source' AND p.device_id = d.id
+    ORDER BY p.created_at DESC, p.reading_id DESC
+    LIMIT 1
+)";
+
+try {
+    $result = $conn->query(sprintf($baseSql, $aiColumns, $aiJoin));
+} catch (mysqli_sql_exception $e) {
+    // ai_predictions not created yet: readings only, as before.
+    $result = $conn->query(sprintf($baseSql, "", ""));
+}
 
 $data = [];
 

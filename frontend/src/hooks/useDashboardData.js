@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import { useSensorData } from "./useSensorData";
-import { getStatusInfo } from "../utils/status";
+import { getRowStatus } from "../utils/status";
 import { parseLocation, groupByBuilding } from "../utils/location";
 
 function levelOf(row) {
-  return getStatusInfo(Number(row.temperature), Number(row.humidity), row.air_quality).level;
+  return getRowStatus(row).level;
 }
 
 // Shared "main dashboard" data shape: poll sensor readings for the given

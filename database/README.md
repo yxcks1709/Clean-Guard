@@ -64,27 +64,30 @@ CREATE TABLE sensor_data_test LIKE sensor_data;
 > unmodified per this cleanup's "do not change functionality" scope; see
 > `backend/README.md`.
 
-## `restroom_sencor_fake_data`
+## AI detection (migration `migrations/001_ai_detection.sql`)
 
-Written by the separate Raspberry Pi AI process, read-only from PHP's
-perspective (`backend/getAIStatus.php`). Not currently called by the
-frontend — the AI panel is a placeholder pending the live demo's AI
-server. Columns, as read by `getAIStatus.php`:
+Run [`migrations/001_ai_detection.sql`](migrations/001_ai_detection.sql) once.
+It adds three optional columns to `sensor_data` and `sensor_data_test`
+(`NULL` when that sensor isn't installed on the device):
 
-| Column                          | Notes                                   |
-|----------------------------------|------------------------------------------|
-| `device_id`                      | Foreign key to `devices.id`.              |
-| `temperature`, `humidity`, `mq135_raw` | Sensor snapshot the prediction was made from. |
-| `window_open_predicted`, `window_open_probability` | Window-open prediction + confidence. |
-| `faucet_on_predicted`, `faucet_on_probability`       | Faucet-on prediction + confidence.   |
-| `leak_active_predicted`, `leak_active_probability`   | Leak prediction + confidence.        |
-| `freeze_risk_1h_predicted`, `freeze_risk_1h_probability` | 1-hour freeze risk prediction + confidence. |
-| `freeze_risk_3h_predicted`, `freeze_risk_3h_probability` | 3-hour freeze risk prediction + confidence. |
-| `created_at`                     | Timestamp of the prediction.              |
+| Column        | Type         | Notes |
+|---------------|--------------|-------|
+| `lux`         | `FLOAT`      | BH1750 light level. |
+| `door_open`   | `TINYINT(1)` | Door reed switch, 1 = open. |
+| `window_open` | `TINYINT(1)` | Window reed switch, 1 = open. |
 
-This table's exact types weren't inferrable from the PHP alone (it's only
-ever read, never created, by this codebase) — coordinate its schema with
-whoever owns the Raspberry Pi AI process.
+`air_quality` now holds the raw MQ-135 ADC value (0–1023) sent by the firmware.
+
+It also creates `ai_predictions`: one row per AI decision, written by
+`ai/worker.py` through `backend/saveAIStatus.php` and read by
+`backend/getAIStatus.php`. Key columns: `device_id`, `reading_id`
+(→ `sensor_data.id`), `created_at`, `ready` (0 during the model's 2 h warm-up),
+`level` (평상시 / 정보 / 주의 / 긴급 / 준비 중), `headline`, `odor`, `door_open` +
+`door_source` (sensor | ai), `window_open` + `window_source`, `light_on`, `lux`,
+`leak`, `leak_probability`, `pipe_frozen`, `freeze_risk_1h` / `freeze_risk_3h`
+(없음 / 주의 / 경보), `items_json` (all alerts) and `probabilities_json` (all 16
+model labels). It replaces the old `restroom_sencor_fake_data` table, which
+nothing reads anymore.
 
 ## Setting up credentials
 

@@ -1,6 +1,6 @@
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { parseLocation } from "../utils/location";
-import { getStatusInfo, getOnlineStatus } from "../utils/status";
+import { getRowStatus, getOnlineStatus } from "../utils/status";
 import { useBathroomDetail } from "../hooks/useBathroomDetail";
 import HistoryChart from "../components/HistoryChart";
 import AIStatusCard from "../components/AIStatusCard";
@@ -29,8 +29,7 @@ function DetailHeader({ onBack, title, subtitle }) {
 // brief calls for full-screen mobile pages, not a desktop side panel --
 // but it does reuse HistoryChart directly, the same status/location
 // utilities every other screen uses, and the same shared AIStatusCard the
-// desktop SidePanel uses (currently a placeholder + AI TEST button; the
-// real connection is provided by a separate server for the demo).
+// desktop SidePanel uses (latest AI decision from the ai/worker.py service).
 export default function MobileBathroomDetail() {
   const { id } = useParams();
   const location = useLocation();
@@ -64,7 +63,7 @@ export default function MobileBathroomDetail() {
     );
   }
 
-  const status = getStatusInfo(Number(row.temperature), Number(row.humidity), row.air_quality);
+  const status = getRowStatus(row);
   const online = getOnlineStatus(row.created_at);
   const { building, floor, room, label } = parseLocation(row.location);
 
@@ -119,7 +118,7 @@ export default function MobileBathroomDetail() {
           <HistoryChart deviceId={row.id} />
         </div>
 
-        <AIStatusCard />
+        <AIStatusCard deviceId={row.id} table={mode === "test" ? "test" : "live"} />
 
         <div className="text-[10px] text-slate-400 text-center pb-2">
           마지막 업데이트: {row.created_at}

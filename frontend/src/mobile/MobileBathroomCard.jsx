@@ -1,15 +1,11 @@
-import { getStatusInfo, getOnlineStatus } from "../utils/status";
+import { getRowStatus, getOnlineStatus } from "../utils/status";
 import { parseLocation } from "../utils/location";
 
 // Touch-optimized full-width card for a single bathroom's latest reading,
 // used by the mobile main screen's scrollable list. Reuses the exact same
 // status/location logic the desktop grid uses -- only the layout differs.
 export default function MobileBathroomCard({ row, onTap }) {
-  const status = getStatusInfo(
-    Number(row.temperature),
-    Number(row.humidity),
-    row.air_quality
-  );
+  const status = getRowStatus(row);
   const online = getOnlineStatus(row.created_at);
   const { building, room, label } = parseLocation(row.location);
 

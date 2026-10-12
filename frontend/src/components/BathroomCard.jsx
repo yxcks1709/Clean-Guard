@@ -1,8 +1,8 @@
-import { getStatusInfo, getOnlineStatus } from "../utils/status";
+import { getRowStatus, getOnlineStatus } from "../utils/status";
 import { parseLocation } from "../utils/location";
 
 export default function BathroomCard({ data, isSelected, onSelect }) {
-    const status = getStatusInfo(Number(data.temperature), Number(data.humidity), data.air_quality);
+    const status = getRowStatus(data);
     const online = getOnlineStatus(data.created_at);
     const { room, label } = parseLocation(data.location);
 
@@ -38,10 +38,9 @@ export default function BathroomCard({ data, isSelected, onSelect }) {
             </div>
 
             {/* Device Status (administrative: 정상/점검중/고장) alongside the
-                environmental Normal/Warning/Danger badge. AI Status is shown
-                on the Restroom Detail Screen (AIStatusCard placeholder), not
-                on this summary card, while the real AI connection is paused
-                for the demo. */}
+                status badge -- the AI's verdict (🤖) when the AI service has
+                judged this device recently, otherwise the threshold rules.
+                Full AI detail is in AIStatusCard on the detail panel. */}
             <div className="flex items-center justify-between gap-2">
                 <span className="inline-flex items-center rounded border border-slate-200 bg-slate-50 text-slate-600 font-bold text-[10px] px-1.5 py-0.5">
                     {data.STATUS ?? "-"}

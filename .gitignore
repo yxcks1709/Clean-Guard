@@ -53,3 +53,8 @@ coverage/
 *.tmp
 *.bak
 ~$*
+
+# ---- AI service ----
+ai/config.json
+__pycache__/
+ai/.venv/

@@ -9,6 +9,8 @@
 // Reads from VITE_API_URL (see .env.example) so the backend origin isn't
 // hardcoded in source; falls back to the project's current deployment so
 // behavior is unchanged for anyone who hasn't set up a .env file.
+import { getTestSensors, getTestAIStatus, getTestHistory, isTestDevice } from "./testReplay";
+
 const API_BASE = import.meta.env.VITE_API_URL || "https://kbu1.dothome.co.kr";
 
 // Both helpers swallow network/parse failures and return null instead of
@@ -49,9 +51,12 @@ async function postJSON(path, body) {
 // ("live") and Test ("test") mode only. History mode intentionally does
 // NOT read through here: it must never be collapsed to one row per
 // device (see getSensorLog below).
+//
+// Test mode does not call the backend: it plays back a recording of the real
+// AI on simulated restrooms (see services/testReplay.js).
 export async function getSensors(mode = "live") {
-  const table = mode === "test" ? "test" : "live";
-  const data = await getJSON(`/getSensors.php?table=${table}`);
+  if (mode === "test") return getTestSensors();
+  const data = await getJSON(`/getSensors.php?table=live`);
   return Array.isArray(data) ? data : [];
 }
 
@@ -60,6 +65,7 @@ export async function getSensors(mode = "live") {
 // no separate history table). Powers the HistoryChart component.
 export async function getHistory(deviceId) {
   if (!deviceId) return [];
+  if (isTestDevice(deviceId)) return getTestHistory(deviceId);
   const data = await getJSON(`/getHistory.php?device_id=${encodeURIComponent(deviceId)}`);
   return Array.isArray(data) ? data : [];
 }
@@ -75,6 +81,19 @@ export async function getSensorLog({ page = 1, pageSize = 50 } = {}) {
     total: data?.total ?? 0,
     totalPages: data?.totalPages ?? 0,
   };
+}
+
+// Latest AI decision for one device (odor, door/window, lights, leak,
+// frozen pipes), written by the ai/worker.py service. Returns
+// { available: false } when the service hasn't judged this device yet.
+export async function getAIStatus(deviceId, table = "live") {
+  if (!deviceId) return { available: false };
+  if (table === "test" || isTestDevice(deviceId)) return getTestAIStatus(deviceId);
+  const source = table === "test" ? "test" : "live";
+  const data = await getJSON(
+    `/getAIStatus.php?device_id=${encodeURIComponent(deviceId)}&table=${source}`
+  );
+  return data && typeof data === "object" ? data : { available: false };
 }
 
 // ---------------------------------------------------------------------

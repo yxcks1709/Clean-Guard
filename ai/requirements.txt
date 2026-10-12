@@ -1,0 +1,5 @@
+# Same versions the model was trained and saved with (restroom_sensor_ai). Python 3.13.
+numpy==2.5.3
+pandas==3.0.5
+scikit-learn==1.9.1
+joblib==1.6.0
